@@ -15,6 +15,11 @@ jobs:
       - name: Descàrrega del codi font
         uses: actions/checkout@v4
 
+      - name: Passar nom del repositori a minúscules
+        id: string
+        run: |
+          echo "repo_lowercase=${GITHUB_REPOSITORY,,}" >> ${GITHUB_OUTPUT}
+
       - name: Login al registre GHCR
         uses: docker/login-action@v3
         with:
@@ -27,12 +32,17 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ steps.string.outputs.repo_lowercase }}:latest
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Passar nom del repositori a minúscules per al deploy
+        id: string_deploy
+        run: |
+          echo "repo_lowercase=${GITHUB_REPOSITORY,,}" >> ${GITHUB_OUTPUT}
+
       - name: Desplegar la imatge via SSH a AWS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -41,7 +51,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            export IMAGE=ghcr.io/${{ github.repository }}:latest
+            export IMAGE=ghcr.io/${{ steps.string_deploy.outputs.repo_lowercase }}:latest
             export PORT=80
             cd ~/taskmanager
             docker compose -f docker-compose.yml up -d --pull always --no-build
